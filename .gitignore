@@ -1,0 +1,13 @@
+dataset/
+
+outputs/
+
+spaceobject_dataset.zip
+
+webapp/static/gradcam/*.jpg
+
+__pycache__/
+
+*.pyc
+
+.vscode/

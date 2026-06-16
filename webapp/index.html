@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ASTRO — Space Object Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --void:       #050508;
+    --deep:       #0a0a12;
+    --surface:    #10101e;
+    --panel:      #151525;
+    --border:     #1e1e38;
+    --muted:      #3a3a5c;
+    --text-dim:   #7070a0;
+    --text:       #c8c8e8;
+    --text-bright:#f0f0ff;
+    --violet:     #7c3aed;
+    --violet-glow:#9d5cff;
+    --cyan:       #22d3ee;
+    --cyan-dim:   #0e7490;
+    --amber:      #f59e0b;
+    --green:      #10b981;
+    --red:        #ef4444;
+    --font-mono:  'Space Mono', monospace;
+    --font-ui:    'Inter', sans-serif;
+    --font-display:'Space Grotesk', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--void);
+    color: var(--text);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ── STAR FIELD ── */
+  #starfield {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none; overflow: hidden;
+  }
+  .star {
+    position: absolute; border-radius: 50%;
+    background: white; opacity: 0;
+    animation: twinkle var(--dur, 4s) var(--delay, 0s) infinite ease-in-out;
+  }
+  @keyframes twinkle {
+    0%,100% { opacity: 0; transform: scale(0.8); }
+    50%      { opacity: var(--bright, 0.6); transform: scale(1.2); }
+  }
+
+  /* ── LAYOUT ── */
+  .page { position: relative; z-index: 1; }
+
+  /* ── NAV ── */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    background: rgba(5,5,8,0.7);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo {
+    font-family: var(--font-display);
+    font-weight: 700; font-size: 1.1rem;
+    letter-spacing: 0.15em;
+    color: var(--text-bright);
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .nav-logo .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; box-shadow: 0 0 8px var(--cyan); }
+    50% { opacity: 0.4; box-shadow: 0 0 3px var(--cyan); }
+  }
+  .nav-meta {
+    font-family: var(--font-mono);
+    font-size: 0.65rem; color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-align: right;
+  }
+  .nav-meta span { color: var(--cyan); }
+  
+  /* ── HERO ── */
+  .hero {
+    text-align: center;
+    padding: 5rem 2rem 3rem;
+    position: relative;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    letter-spacing: 0.3em; color: var(--cyan);
+    text-transform: uppercase; margin-bottom: 1.5rem;
+  }
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 700; line-height: 1.05;
+    color: var(--text-bright);
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+  .hero-title em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--violet-glow), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    font-size: 1rem; color: var(--text-dim); font-weight: 300;
+    max-width: 480px; margin: 0 auto 2rem; line-height: 1.7;
+  }
+  .stats-row {
+    display: flex; justify-content: center; gap: 3rem;
+    flex-wrap: wrap; margin-top: 2rem;
+  }
+  .stat { text-align: center; }
+  .stat-num {
+    font-family: var(--font-mono); font-size: 1.5rem;
+    color: var(--text-bright); font-weight: 700;
+  }
+  .stat-num .accent { color: var(--cyan); }
+  .stat-label {
+    font-size: 0.7rem; color: var(--text-dim);
+    letter-spacing: 0.15em; text-transform: uppercase; margin-top: 0.2rem;
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 1rem 0;
+  }
+
+  /* ── MAIN PANEL ── */
+  .classifier-section {
+    max-width: 1100px; margin: 0 auto;
+    padding: 2rem 1.5rem 6rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 768px) {
+    .classifier-section { grid-template-columns: 1fr; }
+  }
+
+  /* ── PANEL CARD ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(124,58,237,0.05);
+  }
+  .panel-icon {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--violet-glow);
+    box-shadow: 0 0 6px var(--violet-glow);
+  }
+  .panel-title {
+    font-family: var(--font-mono); font-size: 0.65rem;
+    letter-spacing: 0.2em; color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .panel-title b { color: var(--text); }
+  .panel-body { padding: 1.5rem; }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    border: 2px dashed var(--muted);
+    border-radius: 8px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--violet-glow);
+    background: rgba(124,58,237,0.06);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 2;
+  }
+  .upload-icon {
+    width: 48px; height: 48px; margin: 0 auto 1rem;
+    background: var(--surface); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+  }
+  .upload-icon svg { width: 22px; height: 22px; stroke: var(--violet-glow); fill: none; }
+  .upload-label {
+    font-size: 0.9rem; color: var(--text); font-weight: 500;
+    margin-bottom: 0.3rem;
+  }
+  .upload-hint {
+    font-size: 0.75rem; color: var(--text-dim);
+  }
+  .upload-hint span { color: var(--violet-glow); }
+
+  /* ── IMAGE PREVIEW WITH SCAN RING ── */
+  .preview-wrap {
+    position: relative; display: none;
+    margin-bottom: 1.25rem;
+  }
+  .preview-wrap.visible { display: block; }
+  .scan-container {
+    position: relative; width: 100%; aspect-ratio: 1;
+    border-radius: 8px; overflow: hidden;
+    background: var(--surface);
+  }
+  .preview-img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .scan-ring {
+    position: absolute; inset: -4px;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    background: conic-gradient(from var(--angle, 0deg), var(--cyan), var(--violet-glow), transparent) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .scan-ring.active {
+    opacity: 1;
+    animation: rotate-ring 1.2s linear infinite;
+  }
+  @property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+  @keyframes rotate-ring {
+    to { --angle: 360deg; }
+  }
+  .scan-label {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--cyan); letter-spacing: 0.15em;
+    background: rgba(5,5,8,0.8); padding: 2px 8px; border-radius: 4px;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .scan-label.visible { opacity: 1; }
+
+  /* ── CLASSIFY BUTTON ── */
+  .classify-btn {
+    width: 100%; padding: 0.85rem;
+    background: linear-gradient(135deg, var(--violet), #5b21b6);
+    border: none; border-radius: 8px;
+    color: white; font-family: var(--font-display);
+    font-size: 0.9rem; font-weight: 600;
+    letter-spacing: 0.05em; cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+    margin-top: 1rem;
+    box-shadow: 0 0 20px rgba(124,58,237,0.3);
+  }
+  .classify-btn:hover:not(:disabled) {
+    box-shadow: 0 0 30px rgba(124,58,237,0.5);
+    transform: translateY(-1px);
+  }
+  .classify-btn:disabled {
+    opacity: 0.5; cursor: not-allowed; transform: none;
+  }
+  .classify-btn .btn-spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    display: none;
+    animation: spin 0.8s linear infinite;
+  }
+  .classify-btn.loading .btn-spinner { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── RESULT PANEL ── */
+  .result-placeholder {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 340px; gap: 1rem;
+  }
+  .placeholder-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .placeholder-icon svg { width: 28px; height: 28px; stroke: var(--muted); fill: none; }
+  .placeholder-text {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: var(--muted); letter-spacing: 0.1em;
+    text-transform: uppercase; text-align: center;
+  }
+  .result-content { display: none; }
+  .result-content.visible { display: block; }
+
+  /* ── PREDICTION DISPLAY ── */
+  .prediction-header {
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .prediction-class {
+    font-family: var(--font-display);
+    font-size: 2rem; font-weight: 700;
+    color: var(--text-bright); line-height: 1;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .prediction-class .class-accent {
+    display: block; font-size: 0.7rem;
+    font-family: var(--font-mono); font-weight: 400;
+    color: var(--cyan); letter-spacing: 0.2em;
+    margin-bottom: 0.4rem;
+  }
+  .confidence-badge {
+    background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    text-align: center; flex-shrink: 0;
+  }
+  .confidence-badge .conf-val {
+    font-family: var(--font-mono); font-size: 1.4rem;
+    font-weight: 700; color: var(--green); line-height: 1;
+  }
+  .confidence-badge .conf-label {
+    font-size: 0.6rem; color: var(--text-dim);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ── PROBABILITY BARS ── */
+  .prob-section { margin-bottom: 1.5rem; }
+  .prob-section-title {
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--text-dim); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 0.8rem;
+  }
+  .prob-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 0.45rem;
+  }
+  .prob-name {
+    font-family: var(--font-mono); font-size: 0.65rem;
+    color: var(--text-dim); width: 72px; flex-shrink: 0;
+    text-align: right;
+  }
+  .prob-bar-bg {
+    flex: 1; height: 5px; background: var(--surface);
+    border-radius: 999px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .prob-bar-fill {
+    height: 100%; border-radius: 999px;
+    background: var(--violet);
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 0;
+  }
+  .prob-bar-fill.top { background: linear-gradient(90deg, var(--violet), var(--cyan)); }
+  .prob-val {
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--text-dim); width: 36px; text-align: right;
+  }
+
+  /* ── EXPLANATION ── */
+  .explanation-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--cyan);
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .explanation-tag {
+    font-family: var(--font-mono); font-size: 0.55rem;
+    color: var(--cyan); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 0.4rem;
+  }
+  .explanation-text {
+    font-size: 0.82rem; color: var(--text); line-height: 1.6;
+    font-style: italic;
+  }
+
+  /* ── ALL PROBS GRID ── */
+  .all-classes { margin-top: 1.25rem; }
+  .all-classes-title {
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--text-dim); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 0.75rem;
+  }
+  .class-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .class-chip {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.5rem 0.75rem;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: border-color 0.2s;
+  }
+  .class-chip.predicted {
+    border-color: var(--violet);
+    background: rgba(124,58,237,0.08);
+  }
+  .class-chip-name {
+    font-family: var(--font-mono); font-size: 0.65rem;
+    color: var(--text-dim);
+  }
+  .class-chip.predicted .class-chip-name { color: var(--violet-glow); }
+  .class-chip-pct {
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--muted);
+  }
+  .class-chip.predicted .class-chip-pct { color: var(--cyan); }
+
+  /* ── ERROR ── */
+  .error-box {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 6px; padding: 1rem;
+    font-size: 0.82rem; color: #fca5a5;
+    display: none;
+  }
+  .error-box.visible { display: block; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2.5rem;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 1rem;
+    background: rgba(5,5,8,0.6);
+  }
+  .footer-info {
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--text-dim); letter-spacing: 0.1em;
+  }
+  .footer-info span { color: var(--violet-glow); }
+  .classes-row {
+    display: flex; flex-wrap: wrap; gap: 0.4rem;
+  }
+  .class-tag {
+    font-family: var(--font-mono); font-size: 0.55rem;
+    color: var(--muted); background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2px 8px; border-radius: 999px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.75rem 1rem;
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: var(--text-dim); letter-spacing: 0.05em;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast .toast-icon { color: var(--cyan); margin-right: 0.4rem; }
+</style>
+</head>
+<body>
+
+<div id="starfield"></div>
+
+<div class="page">
+
+  <!-- NAV -->
+  <nav>
+
+    <div class="nav-logo">
+
+        <div class="dot"></div>
+
+        ASTRO
+
+        <span style="color:var(--text-dim);font-weight:300;">
+
+            CLASSIFY
+
+        </span>
+
+    </div>
+
+    <div class="nav-meta">
+
+        MODEL: MobileNetV2
+
+        &nbsp;|&nbsp;
+
+        CLASSES: <span>12</span>
+
+        &nbsp;|&nbsp;
+
+        DATASET: <span>3419 IMG</span>
+
+    </div>
+
+  </nav>
+
+  <!-- HERO -->
+  <section id="home" class="hero">
+    <div class="hero-eyebrow">Deep Space Object Recognition System</div>
+    <h1 class="hero-title">Identify Objects<br>From <em>the Cosmos</em></h1>
+    <p class="hero-sub">Upload an image of any space object and the neural network will classify it across 12 astrophysical categories with confidence scoring.</p>
+    <div class="divider"></div>
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-num"><span class="accent">3,419</span></div>
+        <div class="stat-label">Training Images</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num"><span class="accent">12</span></div>
+        <div class="stat-label">Object Classes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num"><span class="accent">MNV2</span></div>
+        <div class="stat-label">Architecture</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num"><span class="accent">224²</span></div>
+        <div class="stat-label">Input Resolution</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLASSIFIER -->
+  <section id="classifier" class="classifier-section">
+
+    <!-- LEFT: Upload -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-icon"></div>
+          <div class="panel-title"><b>IMAGE INPUT</b> &nbsp;/&nbsp; Upload or Drag & Drop</div>
+        </div>
+        <div class="panel-body">
+
+          <div class="preview-wrap" id="previewWrap">
+            <div class="scan-container">
+              <img class="preview-img" id="previewImg" src="" alt="Preview"/>
+              <div class="scan-ring" id="scanRing"></div>
+              <div class="scan-label" id="scanLabel">SCANNING...</div>
+            </div>
+          </div>
+
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept="image/*"/>
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="upload-label">Drop your image here</div>
+            <div class="upload-hint">PNG, JPG, WEBP &nbsp;·&nbsp; <span>Browse files</span></div>
+          </div>
+
+          <div class="error-box" id="errorBox"></div>
+
+          <button class="classify-btn" id="classifyBtn" disabled>
+            <div class="btn-spinner"></div>
+            <span class="btn-text">⬡ &nbsp;CLASSIFY OBJECT</span>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- Info card -->
+      <div class="panel" style="margin-top:1.25rem;">
+        <div class="panel-header">
+          <div class="panel-icon" style="background:var(--cyan);box-shadow:0 0 6px var(--cyan)"></div>
+          <div class="panel-title"><b>DETECTABLE CLASSES</b></div>
+        </div>
+        <div class="panel-body" style="padding:1rem 1.25rem;">
+          <div class="classes-row">
+            <span class="class-tag">asteroid</span>
+            <span class="class-tag">black_hole</span>
+            <span class="class-tag">earth</span>
+            <span class="class-tag">galaxy</span>
+            <span class="class-tag">jupiter</span>
+            <span class="class-tag">mars</span>
+            <span class="class-tag">mercury</span>
+            <span class="class-tag">neptune</span>
+            <span class="class-tag">pluto</span>
+            <span class="class-tag">saturn</span>
+            <span class="class-tag">uranus</span>
+            <span class="class-tag">venus</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Results -->
+    <div>
+      <div class="panel" id="resultPanel">
+        <div class="panel-header">
+          <div class="panel-icon" style="background:var(--cyan);box-shadow:0 0 6px var(--cyan)"></div>
+          <div class="panel-title"><b>CLASSIFICATION RESULT</b> &nbsp;/&nbsp; AI Analysis</div>
+        </div>
+        <div class="panel-body">
+
+          <div class="result-placeholder" id="resultPlaceholder">
+            <div class="placeholder-icon">
+              <svg viewBox="0 0 24 24" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 6.364 15.364M12 3A9 9 0 0 0 5.636 18.364" stroke-linecap="round"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>
+            </div>
+            <div class="placeholder-text">Awaiting image input<br>Upload a space object image<br>to begin classification</div>
+          </div>
+
+          <div class="result-content" id="resultContent">
+
+            <div class="prediction-header">
+              <div class="prediction-class">
+                <span class="class-accent">IDENTIFIED OBJECT</span>
+                <span id="predClassName">—</span>
+              </div>
+              <div class="confidence-badge">
+                <div class="conf-val" id="confValue">—</div>
+                <div class="conf-label">Confidence</div>
+              </div>
+            </div>
+
+            <div class="explanation-box">
+              <div class="explanation-tag">◈ Neural Network Insight</div>
+              <div class="explanation-text" id="explanationText">—</div>
+            </div>
+
+            <div class="prob-section">
+              <div class="prob-section-title">Top-5 Class Probabilities</div>
+              <div id="probBars"></div>
+            </div>
+
+            <div class="all-classes">
+              <div class="all-classes-title">All Class Scores</div>
+              <div class="class-grid" id="classGrid"></div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </section>
+  
+<!-- ================= MODEL PERFORMANCE ================= -->
+<section id="gradcam"
+
+class="classifier-section"
+
+style="padding-top:0;">
+<div class="panel" style="grid-column:1/-1;">
+<div class="panel-header">
+<div class="panel-icon"></div>
+<div class="panel-title"><b>MODEL PERFORMANCE</b> / Evaluation Metrics</div>
+</div>
+<div class="panel-body">
+<div class="stats-row">
+<div class="stat"><div class="stat-num"><span class="accent">97.68%</span></div><div class="stat-label">Accuracy</div></div>
+<div class="stat"><div class="stat-num"><span class="accent">97.77%</span></div><div class="stat-label">Precision</div></div>
+<div class="stat"><div class="stat-num"><span class="accent">97.68%</span></div><div class="stat-label">Recall</div></div>
+<div class="stat"><div class="stat-num"><span class="accent">97.69%</span></div><div class="stat-label">F1 Score</div></div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ================= DATASET INFORMATION ================= -->
+<section id="dataset"
+
+class="classifier-section">
+<div class="panel" style="grid-column:1/-1;">
+<div class="panel-header">
+<div class="panel-icon"></div>
+<div class="panel-title"><b>DATASET INFORMATION</b> / Astrophysical Objects Dataset</div>
+</div>
+<div class="panel-body">
+<div class="class-grid">
+<div class="class-chip"><span class="class-chip-name">Training Images</span><span class="class-chip-pct">2416</span></div>
+<div class="class-chip"><span class="class-chip-name">Validation Images</span><span class="class-chip-pct">658</span></div>
+<div class="class-chip"><span class="class-chip-name">Test Images</span><span class="class-chip-pct">345</span></div>
+<div class="class-chip"><span class="class-chip-name">Total Classes</span><span class="class-chip-pct">12</span></div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ================= MODEL ARCHITECTURE ================= -->
+<section class="classifier-section" style="padding-top:0;">
+<div class="panel" style="grid-column:1/-1;">
+<div class="panel-header">
+<div class="panel-icon"></div>
+<div class="panel-title"><b>MODEL ARCHITECTURE</b> / MobileNetV2</div>
+</div>
+<div class="panel-body">
+<div class="explanation-box">
+<div class="explanation-tag">◈ Deep Learning Architecture</div>
+<div class="explanation-text">
+Model: MobileNetV2<br>
+Framework: PyTorch<br>
+Input Size: 224×224 RGB<br>
+Classes: 12 Astrophysical Objects<br>
+Transfer Learning Enabled<br>
+Optimizer: Adam<br>
+Loss Function: CrossEntropyLoss
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ================= GRAD-CAM PLACEHOLDER ================= -->
+<section class="classifier-section" style="padding-top:0;">
+<div class="panel" style="grid-column:1/-1;">
+<div class="panel-header">
+<div class="panel-icon"></div>
+<div class="panel-title"><b>VISUAL EXPLANATION</b> / Grad-CAM Analysis</div>
+</div>
+<div class="panel-body">
+<div class="class-grid">
+<div>
+
+    <h4>Original Image</h4>
+
+    <div class="upload-zone">
+
+        <img
+
+            id="originalGradcam"
+
+            src=""
+
+            style="
+                width:100%;
+                border-radius:12px;
+                display:none;
+            "
+
+        >
+
+    </div>
+
+</div>
+
+
+<div>
+
+    <h4>Grad-CAM Heatmap</h4>
+
+    <div class="upload-zone">
+
+        <img
+
+            id="heatmapGradcam"
+
+            src=""
+
+            style="
+                width:100%;
+                border-radius:12px;
+                display:none;
+            "
+
+        >
+
+    </div>
+
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- ================= FUTURE SCOPE ================= -->
+<section class="classifier-section" style="padding-top:0;">
+<div class="panel" style="grid-column:1/-1;">
+<div class="panel-header">
+<div class="panel-icon"></div>
+<div class="panel-title"><b>FUTURE SCOPE</b></div>
+</div>
+<div class="panel-body">
+<div class="explanation-text">
+• Real-time Telescope Image Classification<br>
+• NASA API Integration<br>
+• Mobile Application Deployment<br>
+• Multi-Object Detection in Space Images<br>
+• Deep Space Exploration Assistant<br>
+• Autonomous Astronomical Discovery System
+</div>
+</div>
+</div>
+</section>
+
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-info">
+      ASTRO<span>CLASSIFY</span> &nbsp;·&nbsp; MobileNetV2 &nbsp;·&nbsp; PyTorch &nbsp;·&nbsp; Kaggle Astrophysical Dataset
+    </div>
+    <div class="footer-info">
+
+    <span style="color:var(--cyan);">© 2026</span>
+
+    &nbsp; All Rights Reserved &nbsp;|&nbsp;
+
+    <span style="color:var(--text-bright);">
+
+        Mullapudi Manasa
+
+    </span>
+
+    </div>
+  </footer>
+</div>
+
+<div class="toast" id="toast"><span class="toast-icon">◈</span><span id="toastMsg"></span></div>
+
+<script>
+// ── STAR FIELD ──
+const starfield = document.getElementById('starfield');
+for (let i = 0; i < 180; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 2.5 + 0.5;
+  s.style.cssText = `
+    width:${size}px; height:${size}px;
+    top:${Math.random()*100}%; left:${Math.random()*100}%;
+    --dur:${Math.random()*5+2}s;
+    --delay:${Math.random()*6}s;
+    --bright:${Math.random()*0.5+0.2};
+  `;
+  starfield.appendChild(s);
+}
+
+// ── CLASS DATA ──
+const CLASS_NAMES = [
+  'asteroid','black_hole','earth','galaxy','jupiter',
+  'mars','mercury','neptune','pluto','saturn','uranus','venus'
+];
+const EXPLANATIONS = {
+  asteroid: "The model identified irregular rocky structures and asteroid-like surface patterns.",
+  black_hole: "The model focused on the dark central region and surrounding accretion features typical of black holes.",
+  earth: "The model detected Earth's characteristic blue oceans, clouds, and continental structures.",
+  galaxy: "The model focused on the bright galactic core and spiral or clustered stellar structures.",
+  jupiter: "The model recognized Jupiter's large planetary body and atmospheric band patterns.",
+  mars: "The model detected the reddish surface coloration and planetary appearance of Mars.",
+  mercury: "The model identified Mercury's gray rocky surface and crater-rich appearance.",
+  neptune: "The model focused on Neptune's deep blue coloration and planetary structure.",
+  pluto: "The model recognized Pluto's icy appearance and dwarf planet characteristics.",
+  saturn: "The model focused on the ring system and planetary body, which are distinctive features of Saturn.",
+  uranus: "The model detected Uranus' pale blue color and smooth planetary appearance.",
+  venus: "The model identified Venus' bright cloudy atmosphere and characteristic coloration."
+};
+
+// ── ELEMENTS ──
+const fileInput     = document.getElementById('fileInput');
+const uploadZone    = document.getElementById('uploadZone');
+const previewWrap   = document.getElementById('previewWrap');
+const previewImg    = document.getElementById('previewImg');
+const scanRing      = document.getElementById('scanRing');
+const scanLabel     = document.getElementById('scanLabel');
+const classifyBtn   = document.getElementById('classifyBtn');
+const errorBox      = document.getElementById('errorBox');
+const resultPlaceholder = document.getElementById('resultPlaceholder');
+const resultContent = document.getElementById('resultContent');
+const predClassName = document.getElementById('predClassName');
+const confValue     = document.getElementById('confValue');
+const explanationText = document.getElementById('explanationText');
+const probBars      = document.getElementById('probBars');
+const classGrid     = document.getElementById('classGrid');
+const toast         = document.getElementById('toast');
+const toastMsg      = document.getElementById('toastMsg');
+
+let currentFile = null;
+
+// ── TOAST ──
+function showToast(msg) {
+  toastMsg.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ── DRAG & DROP ──
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type.startsWith('image/')) handleFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  currentFile = file;
+  const url = URL.createObjectURL(file);
+  previewImg.src = url;
+  previewWrap.classList.add('visible');
+  uploadZone.style.display = 'none';
+  classifyBtn.disabled = false;
+  errorBox.classList.remove('visible');
+  resultContent.classList.remove('visible');
+  resultPlaceholder.classList.remove('visible');
+  resultPlaceholder.style.display = 'flex';
+  showToast('Image loaded — ready to classify');
+}
+
+// ── CLASSIFY ──
+classifyBtn.addEventListener('click', classify);
+
+async function classify() {
+
+    if (!currentFile) return;
+
+    classifyBtn.disabled = true;
+    classifyBtn.classList.add('loading');
+    classifyBtn.querySelector('.btn-text').textContent = 'ANALYSING...';
+
+    errorBox.classList.remove('visible');
+
+    scanRing.classList.add('active');
+    scanLabel.classList.add('visible');
+
+    resultContent.classList.remove('visible');
+    resultPlaceholder.style.display = 'flex';
+
+    try {
+
+        const formData = new FormData();
+
+        formData.append("image", currentFile);
+
+        const response = await fetch("/predict", {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.error) {
+            throw new Error(result.error);
+        }
+
+        displayResult({
+            predicted_class: result.prediction.toLowerCase(),
+            confidence: result.confidence / 100,
+            probabilities: {
+                [result.prediction.toLowerCase()]: result.confidence / 100
+            }
+        });
+
+        explanationText.textContent = result.explanation;
+        document.getElementById(
+            "originalGradcam"
+        ).src =
+            result.original_image +
+            "?t=" +
+            Date.now();
+
+        document.getElementById(
+            "heatmapGradcam"
+        ).src =
+            result.heatmap_image +
+            "?t=" +
+            Date.now();
+
+        document.getElementById(
+            "originalGradcam"
+        ).style.display = "block";
+
+        document.getElementById(
+            "heatmapGradcam"
+        ).style.display = "block";
+    } catch (err) {
+
+        errorBox.textContent =
+            "⚠ Classification failed: " + err.message;
+
+        errorBox.classList.add('visible');
+
+        resultPlaceholder.style.display = 'flex';
+
+    } finally {
+
+        classifyBtn.disabled = false;
+
+        classifyBtn.classList.remove('loading');
+
+        classifyBtn.querySelector('.btn-text').textContent =
+            '⬡ CLASSIFY OBJECT';
+
+        scanRing.classList.remove('active');
+
+        scanLabel.classList.remove('visible');
+    }
+}
+
+function displayResult(result) {
+  const cls = result.predicted_class;
+  const conf = result.confidence;
+  const probs = result.probabilities;
+
+  // Header
+  predClassName.textContent = cls.replace('_', ' ').toUpperCase();
+  confValue.textContent = (conf * 100).toFixed(1) + '%';
+
+  // Color confidence badge
+  const badge = confValue.closest('.confidence-badge');
+  const pct = conf * 100;
+  if (pct >= 80) {
+    badge.style.background = 'rgba(16,185,129,0.12)';
+    badge.style.borderColor = 'rgba(16,185,129,0.3)';
+    confValue.style.color = 'var(--green)';
+  } else if (pct >= 50) {
+    badge.style.background = 'rgba(245,158,11,0.12)';
+    badge.style.borderColor = 'rgba(245,158,11,0.3)';
+    confValue.style.color = 'var(--amber)';
+  } else {
+    badge.style.background = 'rgba(239,68,68,0.12)';
+    badge.style.borderColor = 'rgba(239,68,68,0.3)';
+    confValue.style.color = 'var(--red)';
+  }
+
+  // Explanation
+  explanationText.textContent = EXPLANATIONS[cls] || 'Object identified by visual pattern recognition.';
+
+  // Top-5 bars
+  const sorted = Object.entries(probs).sort((a,b) => b[1]-a[1]).slice(0,5);
+  probBars.innerHTML = '';
+  sorted.forEach(([name, prob], i) => {
+    const row = document.createElement('div');
+    row.className = 'prob-row';
+    row.innerHTML = `
+      <div class="prob-name">${name.replace('_',' ')}</div>
+      <div class="prob-bar-bg">
+        <div class="prob-bar-fill ${i===0?'top':''}" style="width:0%" data-target="${(prob*100).toFixed(1)}%"></div>
+      </div>
+      <div class="prob-val">${(prob*100).toFixed(1)}%</div>
+    `;
+    probBars.appendChild(row);
+  });
+  // Animate bars
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.prob-bar-fill').forEach(bar => {
+      bar.style.width = bar.dataset.target;
+    });
+  });
+
+  // All-class grid
+  const allSorted = Object.entries(probs).sort((a,b) => b[1]-a[1]);
+  classGrid.innerHTML = '';
+  allSorted.forEach(([name, prob]) => {
+    const chip = document.createElement('div');
+    chip.className = 'class-chip' + (name === cls ? ' predicted' : '');
+    chip.innerHTML = `
+      <span class="class-chip-name">${name.replace('_','_')}</span>
+      <span class="class-chip-pct">${(prob*100).toFixed(1)}%</span>
+    `;
+    classGrid.appendChild(chip);
+  });
+
+  // Show result
+  resultPlaceholder.style.display = 'none';
+  resultContent.classList.add('visible');
+  showToast(`Identified: ${cls.replace('_',' ').toUpperCase()}`);
+}
+
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(',')[1]);
+    r.onerror = () => reject(new Error('File read failed'));
+    r.readAsDataURL(file);
+  });
+}
+</script>
+</body>
+</html>
